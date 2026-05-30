@@ -130,7 +130,3 @@ GitHub Actions を用いて、リポジトリへ push するたびにテスト�
     https://docs.github.com/ja/actions/using-workflows/workflow-syntax-for-github-actions
 
 ================================================================
-  [処理の流れ]
-    1. actions/checkout でリポジトリを取得
-    2. chmod +x でスクリプトに実行権限を付与
-    3. ./test_gcd.sh を実行（テスト本体）
