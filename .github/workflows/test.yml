@@ -1,36 +1,14 @@
-# =================================================================
-# GitHub Actions ワークフロー定義
-# 概要：リポジトリへの push / pull request のたびに、
-#       テスト用スクリプト test_gcd.sh を自動実行する。
-#       test_gcd.sh が異常終了(exit 1)した場合、
-#       このワークフローも失敗として扱われ、GitHub上で通知される。
-# =================================================================
+name: gcd_test
+on: [push]
 
-name: GCD Test                # ワークフローの表示名
-
-# ----- 実行のきっかけ（トリガー） -----
-on:
-  push:                       # push されたとき
-  pull_request:               # プルリクエストが作られたとき
-  workflow_dispatch:          # 手動実行ボタンからも動かせるようにする
-
-# ----- 実行する処理 -----
 jobs:
-  test:                       # ジョブ名
-    runs-on: ubuntu-latest    # GitHubが用意するUbuntuのVM上で実行
-
+  io_test:
+    name: Use Linux commands
+    runs-on: ubuntu-latest
     steps:
-      # ① リポジトリの中身をVMに取得する
-      - name: リポジトリをチェックアウト
+      - name: Checkout
         uses: actions/checkout@v4
-
-      # ② スクリプトに実行権限を付与する
-      #    （念のため。git管理下で実行ビットが落ちても動くように）
-      - name: 実行権限を付与
+      - name: Permission Setting
         run: chmod +x gcd.sh test_gcd.sh
-
-      # ③ テストを実行する
-      #    test_gcd.sh が exit 1 で終わると、このステップが失敗し、
-      #    ワークフロー全体が「失敗」となる。
-      - name: テストスクリプトを実行
+      - name: Test Run
         run: ./test_gcd.sh

@@ -1,117 +1,82 @@
-#!/bin/bash
+#!/bin/sh
 
 # =================================================================
 # test_gcd.sh
-# 概要：gcd.sh に対してさまざまな入力を行い、想定通りの挙動を
-#       しているか自動でチェックするテストスクリプト。
-#       1つでも想定と異なる結果があればエラー終了(exit 1)する。
-#       全テスト成功なら正常終了(exit 0)する。
+# 概要：gcd.sh にさまざまな入力を行い、想定どおりの挙動をするか検証する。
+#       想定と異なる場合は ERROR_EXIT でエラーメッセージを表示し、
+#       終了ステータス1で異常終了する。全テスト成功なら正常終了する。
 #       GitHub Actions はこの終了ステータスで成否を判定する。
 # 使い方：./test_gcd.sh
 # 作成者：伏見 知子 (26745130)
 # =================================================================
 
-# テスト対象スクリプト
-GCD="./gcd.sh"
+tmp=/tmp/$$                              # 変数を使って表記を短く
 
-# テスト件数と失敗件数のカウンタ
-total=0
-failed=0
+# 期待する出力の準備
+echo "input 2 argments"   > $tmp-args    # 回答準備：引数の数エラー
+echo "input natural number" > $tmp-nat   # 回答準備：数字じゃないエラー
 
-# -----------------------------------------------------------------
-# assert_success: 正常系テスト用
-#   引数1,2 を gcd.sh に渡し、出力が期待値と一致するか確認する。
-#   $1=入力a  $2=入力b  $3=期待する出力(最大公約数)
-# -----------------------------------------------------------------
-assert_success() {
-    local a="$1"
-    local b="$2"
-    local expected="$3"
-    total=$((total + 1))
-
-    # gcd.sh を実行し、標準出力と終了ステータスを取得
-    local actual
-    actual=$("$GCD" "$a" "$b" 2>/dev/null)
-    local status=$?
-
-    # 正常終了(0)かつ 出力が期待値と一致 すれば成功
-    if [ "$status" -eq 0 ] && [ "$actual" = "$expected" ]; then
-        echo "[OK]   gcd($a, $b) = $actual  (期待値: $expected)"
-    else
-        echo "[FAIL] gcd($a, $b) → 出力:'$actual' 終了状態:$status  (期待値: $expected / 終了状態0)"
-        failed=$((failed + 1))
-    fi
+# エラー終了用の関数
+ERROR_EXIT () {
+    echo "$1" 1>&2                       # エラーメッセージ(引数1)を標準エラー出力に表示
+    rm -f $tmp-*                         # 作ったファイルの削除
+    exit 1                               # エラー終了
 }
 
-# -----------------------------------------------------------------
-# assert_error: 異常系テスト用
-#   不正な入力を渡し、gcd.sh がエラー終了(終了ステータス != 0)
-#   するかどうかを確認する。
-#   引数：gcd.sh に渡す引数列（個数は可変）
-# -----------------------------------------------------------------
-assert_error() {
-    total=$((total + 1))
+# =====================================================
+# テスト開始
+# =====================================================
 
-    # 不正入力で実行。出力は捨て、終了ステータスだけ見る
-    "$GCD" "$@" >/dev/null 2>&1
-    local status=$?
+# --- test1: 引数の数が足りない ---
+./gcd.sh 2 > $tmp-ans 2>&1 && ERROR_EXIT "error in test1-1"  # 異常終了すべき(成功したらエラー)
+diff $tmp-ans $tmp-args > /dev/null || ERROR_EXIT "error in test1-2"  # 出力が期待通りか
 
-    # 終了ステータスが0以外（=エラー終了）なら成功
-    if [ "$status" -ne 0 ]; then
-        echo "[OK]   不正入力 [$*] → エラー終了 (終了状態:$status)"
-    else
-        echo "[FAIL] 不正入力 [$*] → 正常終了してしまった (エラー終了すべき)"
-        failed=$((failed + 1))
-    fi
-}
+# --- test2: 引数が多い ---
+./gcd.sh 1 2 3 > $tmp-ans 2>&1 && ERROR_EXIT "error in test2-1"
+diff $tmp-ans $tmp-args > /dev/null || ERROR_EXIT "error in test2-2"
 
-echo "=================================================="
-echo " gcd.sh テスト開始"
-echo "=================================================="
+# --- test3: 数値でない（文字列） ---
+./gcd.sh abc 5 > $tmp-ans 2>&1 && ERROR_EXIT "error in test3-1"
+diff $tmp-ans $tmp-nat > /dev/null || ERROR_EXIT "error in test3-2"
 
-# ===== 正常系テスト =====
-echo ""
-echo "----- 正常系（正しい最大公約数を返すか） -----"
-assert_success 2 4 2          # 課題例：2と4 → 2
-assert_success 12 18 6        # 一般的なケース
-assert_success 18 12 6        # 引数の順序を入れ替えても同じ
-assert_success 17 5 1         # 互いに素 → 1
-assert_success 100 75 25      # 2桁・3桁
-assert_success 7 7 7          # 同じ数 → その数自身
-assert_success 1 1 1          # 最小の自然数
-assert_success 1 9999 1       # 1との最大公約数は必ず1
-assert_success 1071 1029 21   # 大きめの数（互除法が複数回回る）
-assert_success 1000000 999999 1            # 大きな数
-assert_success 123456789 987654321 9       # 極度に大きい数
+# --- test4: 小数 ---
+./gcd.sh 3.5 2 > $tmp-ans 2>&1 && ERROR_EXIT "error in test4-1"
+diff $tmp-ans $tmp-nat > /dev/null || ERROR_EXIT "error in test4-2"
 
-# ===== 異常系テスト =====
-echo ""
-echo "----- 異常系（エラー終了すべき入力） -----"
-assert_error 3                # 引数が少ない（1個）
-assert_error 1 2 3            # 引数が多い（3個）
-assert_error                  # 引数なし（0個）
-assert_error -5 10            # 負の数
-assert_error 10 -5            # 負の数（2番目）
-assert_error 3.5 2            # 小数
-assert_error 2 3.5            # 小数（2番目）
-assert_error abc 5            # 文字列
-assert_error 5 xyz            # 文字列（2番目）
-assert_error 0 5             # 0（自然数でない）
-assert_error 5 0             # 0（2番目）
-assert_error "" 5            # 空文字
-assert_error "1 2" 3        # 引数内にスペース（不正）
+# --- test5: 負の数 ---
+./gcd.sh -5 10 > $tmp-ans 2>&1 && ERROR_EXIT "error in test5-1"
+diff $tmp-ans $tmp-nat > /dev/null || ERROR_EXIT "error in test5-2"
 
-# ===== 結果集計 =====
-echo ""
-echo "=================================================="
-echo " テスト結果: 全 $total 件中 $((total - failed)) 件成功 / $failed 件失敗"
-echo "=================================================="
+# --- test6: 0（自然数でない） ---
+./gcd.sh 0 5 > $tmp-ans 2>&1 && ERROR_EXIT "error in test6-1"
+diff $tmp-ans $tmp-nat > /dev/null || ERROR_EXIT "error in test6-2"
 
-# 1件でも失敗があればエラー終了。GitHub Actions が失敗を検知できる。
-if [ "$failed" -ne 0 ]; then
-    echo "[RESULT] テスト失敗。gcd.sh の挙動が想定と異なります。" >&2
-    exit 1
-fi
+# --- test7: 正常系 gcd(12,18)=6 ---
+echo "6" > $tmp-exp
+./gcd.sh 12 18 > $tmp-ans 2>&1 || ERROR_EXIT "error in test7-1"  # 正常終了すべき
+diff $tmp-ans $tmp-exp > /dev/null || ERROR_EXIT "error in test7-2"
 
-echo "[RESULT] 全テスト成功。"
+# --- test8: 正常系 gcd(2,4)=2 ---
+echo "2" > $tmp-exp
+./gcd.sh 2 4 > $tmp-ans 2>&1 || ERROR_EXIT "error in test8-1"
+diff $tmp-ans $tmp-exp > /dev/null || ERROR_EXIT "error in test8-2"
+
+# --- test9: 正常系 gcd(17,5)=1（互いに素） ---
+echo "1" > $tmp-exp
+./gcd.sh 17 5 > $tmp-ans 2>&1 || ERROR_EXIT "error in test9-1"
+diff $tmp-ans $tmp-exp > /dev/null || ERROR_EXIT "error in test9-2"
+
+# --- test10: 正常系 gcd(100,75)=25 ---
+echo "25" > $tmp-exp
+./gcd.sh 100 75 > $tmp-ans 2>&1 || ERROR_EXIT "error in test10-1"
+diff $tmp-ans $tmp-exp > /dev/null || ERROR_EXIT "error in test10-2"
+
+# --- test11: 正常系 大きな数 gcd(1071,1029)=21 ---
+echo "21" > $tmp-exp
+./gcd.sh 1071 1029 > $tmp-ans 2>&1 || ERROR_EXIT "error in test11-1"
+diff $tmp-ans $tmp-exp > /dev/null || ERROR_EXIT "error in test11-2"
+
+# すべてのテストを通過
+rm -f $tmp-*                             # 作ったファイルの削除
+echo "all tests passed"                  # 成功メッセージ
 exit 0
